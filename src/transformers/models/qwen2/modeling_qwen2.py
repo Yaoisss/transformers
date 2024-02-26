@@ -1352,6 +1352,8 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
     no `pad_token_id` is defined, it simply takes the last value in each row of the batch. Since it cannot guess the
     padding tokens when `inputs_embeds` are passed instead of `input_ids`, it does the same (take the last value in
     each row of the batch).
+    
+    
     """,
     QWEN2_START_DOCSTRING,
 )
