@@ -1092,76 +1092,62 @@ class Qwen2Model(Qwen2PreTrainedModel):
         )
 
 
+# Qwen2ForCausalLM类继承自Qwen2PreTrainedModel，用于 causal language modeling。
 class Qwen2ForCausalLM(Qwen2PreTrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config):
+        # 调用基类的构造函数
         super().__init__(config)
+        # 实例化基础模型 Qwen2Model模型
         self.model = Qwen2Model(config)
+        # 获取词汇表大小 获取词汇表大小并存储在实例变量中
         self.vocab_size = config.vocab_size
+        # 初始化语言模型头 初始化语言模型头部层（用于生成词元的概率分布），线性映射从隐藏层到词汇表大小
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-
-        # Initialize weights and apply final processing
+        # 初始化权重并进行后处理 Initialize weights and apply final processing
         self.post_init()
 
+    # 获取输入嵌入
     def get_input_embeddings(self):
         return self.model.embed_tokens
 
+    # 设置输入嵌入
     def set_input_embeddings(self, value):
         self.model.embed_tokens = value
 
+    # 获取输出嵌入
     def get_output_embeddings(self):
         return self.lm_head
 
+    # 设置输出嵌入
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
 
+    # 设置解码器部分，即将整个模型替换为新的解码器
     def set_decoder(self, decoder):
         self.model = decoder
 
+    # 获取解码器
     def get_decoder(self):
         return self.model
 
+    # 定义前向传播的方法，该方法接受多个输入参数，并在末尾返回一个或多个输出 添加文档字符串，并定义模型前向传播方法
     @add_start_docstrings_to_model_forward(QWEN2_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+        input_ids: torch.LongTensor = None,  # 输入的ids，通常是序列的索引
+        attention_mask: Optional[torch.Tensor] = None,  # 注意力掩码，用于指示序列中的有效位置
+        position_ids: Optional[torch.LongTensor] = None,  # 位置ids，用于表示序列中每个token的位置
+        past_key_values: Optional[List[torch.FloatTensor]] = None,  # 过去的关键值，用于上下文信息的缓存
+        inputs_embeds: Optional[torch.FloatTensor] = None,  # 输入的嵌入表示，通常用于直接输入序列的嵌入
+        labels: Optional[torch.LongTensor] = None,  # 标签，用于计算损失
+        use_cache: Optional[bool] = None,  # 是否使用缓存，用于控制是否在每一步生成中使用过去的关键值
+        output_attentions: Optional[bool] = None,  # 是否输出注意力权重
+        output_hidden_states: Optional[bool] = None,  # 是否输出隐藏状态
+        return_dict: Optional[bool] = None,  # 是否返回一个字典格式的输出
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        r"""
-        Args:
-            labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
-                Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
-                config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
-                (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
-
-        Returns:
-
-        Example:
-
-        ```python
-        >>> from transformers import AutoTokenizer, Qwen2ForCausalLM
-
-        >>> model = Qwen2ForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
-        >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
-
-        >>> prompt = "Hey, are you conscious? Can you talk to me?"
-        >>> inputs = tokenizer(prompt, return_tensors="pt")
-
-        >>> # Generate
-        >>> generate_ids = model.generate(inputs.input_ids, max_length=30)
-        >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-        "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
-        ```"""
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
