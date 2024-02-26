@@ -1207,6 +1207,14 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
             attentions=outputs.attentions,
         )
 
+    r"""
+    代码逻辑分析： 
+    该函数主要用于准备Transformer模型进行文本生成任务所需的输入数据。
+    首先检查是否存在缓存past_key_values，如果存在则根据attention_mask和past_key_values的信息对input_ids进行裁剪，确保只保留待处理的tokens。
+    接着，如果没有提供position_ids，则根据attention_mask动态计算并生成position_ids。
+    然后，根据是否提供inputs_embeds以及past_key_values的情况决定将input_ids或inputs_embeds放入model_inputs字典。
+    最后，更新model_inputs字典，包括position_ids、past_key_values、use_cache和attention_mask等信息，并返回这个包含了所有必要输入信息的model_inputs字典供模型调用。
+    """
     def prepare_inputs_for_generation(
             self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
     ):
@@ -1282,13 +1290,39 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
         # 返回整理后的模型输入参数
         return model_inputs
 
+    # 定义一个静态方法_reorder_cache
+    # 定义一个静态方法，用于根据beam搜索的索引对缓存进行重新排序
+    r"""
+    代码逻辑分析： 
+    在自回归生成任务中，尤其是结合了Beam Search算法的情况下，每次生成新的token时需要更新缓存以保持与当前最优解序列的对应。
+    此静态方法 _reorder_cache 的目的是根据Beam Search过程中产生的最优序列的索引 beam_idx 来调整Transformer模型内部的缓存结构。
+    1. 函数接受两个参数：past_key_values 是模型之前计算过程中积累的状态缓存，包含了多层Transformer网络的关键信息；
+    beam_idx 是根据当前最优解重新排布后的序号集合。
+    2. 遍历每层缓存layer_past，对于每一层的每一个状态past_state，
+    通过index_select函数选取指定行（即依据beam_idx选择最优解序列中的元素），确保这些状态信息与新生成序列相对应。
+    3. 将重新排列过的该层缓存组合成一个新的元组，并将其加入到最终要返回的reordered_past元组中。
+    4. 循环结束后，返回的是整个模型所有层缓存按照新的序列顺序排列的结果。
+    这个重新排列的缓存可以被用于后续步骤的计算，保证模型能基于当前最优解继续生成文本。
+    """
     @staticmethod
     def _reorder_cache(past_key_values, beam_idx):
+        # 初始化一个空元组reordered_past，用于存储重组后的过去状态
         reordered_past = ()
+        # 遍历输入的过去状态列表past_key_values
+        # 遍历Transformer模型每一层的缓存（past_key_values是一个包含多层缓存信息的元组）
         for layer_past in past_key_values:
+            # 对每个层级的过去状态进行重组
+            # 使用列表推导式，遍历layer_past中的每个past_state
+            # index_select方法根据beam_idx选择past_state中的元素，beam_idx.to(past_state.device)确保索引与设备一致
+            # 将重组后的过去状态添加到reordered_past中
+            # 对于当前层的缓存（layer_past），它通常包含多个状态（如键和值等）组成的元组
+            # 遍历这一层的所有状态并使用index_select函数按照beam_idx选择对应的行
+            # beam_idx是经过beam搜索后得到的新序列中每个token的位置索引
+            # 将索引转换为与past_state相同设备上的张量
             reordered_past += (
                 tuple(past_state.index_select(0, beam_idx.to(past_state.device)) for past_state in layer_past),
             )
+        # 返回重组后的过去状态
         return reordered_past
 
 
