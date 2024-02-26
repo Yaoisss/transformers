@@ -44,16 +44,13 @@ from ...utils import (
 )
 from .configuration_qwen2 import Qwen2Config
 
-
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
     from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
 
     _flash_supports_window_size = "window_size" in list(inspect.signature(flash_attn_func).parameters)
 
-
 logger = logging.get_logger(__name__)
-
 
 _CHECKPOINT_FOR_DOC = "Qwen/Qwen2-7B-beta"
 _CONFIG_FOR_DOC = "Qwen2Config"
@@ -136,7 +133,7 @@ class Qwen2RotaryEmbedding(nn.Module):
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2 :]
+    x2 = x[..., x.shape[-1] // 2:]
     return torch.cat((-x2, x1), dim=-1)
 
 
@@ -242,14 +239,14 @@ class Qwen2Attention(nn.Module):
         )
 
     def forward(
-        self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Cache] = None,
-        output_attentions: bool = False,
-        use_cache: bool = False,
-        **kwargs,
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_value: Optional[Cache] = None,
+            output_attentions: bool = False,
+            use_cache: bool = False,
+            **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         if "padding_mask" in kwargs:
             warnings.warn(
@@ -342,14 +339,14 @@ class Qwen2FlashAttention2(Qwen2Attention):
         self._flash_attn_uses_top_left_mask = not is_flash_attn_greater_or_equal_2_10()
 
     def forward(
-        self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Cache] = None,
-        output_attentions: bool = False,
-        use_cache: bool = False,
-        **kwargs,
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_value: Optional[Cache] = None,
+            output_attentions: bool = False,
+            use_cache: bool = False,
+            **kwargs,
     ):
         if "padding_mask" in kwargs:
             warnings.warn(
@@ -385,10 +382,10 @@ class Qwen2FlashAttention2(Qwen2Attention):
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         use_sliding_windows = (
-            _flash_supports_window_size
-            and getattr(self.config, "sliding_window", None) is not None
-            and kv_seq_len > self.config.sliding_window
-            and self.config.use_sliding_window
+                _flash_supports_window_size
+                and getattr(self.config, "sliding_window", None) is not None
+                and kv_seq_len > self.config.sliding_window
+                and self.config.use_sliding_window
         )
 
         if not _flash_supports_window_size:
@@ -401,9 +398,9 @@ class Qwen2FlashAttention2(Qwen2Attention):
             # Activate slicing cache only if the config has a value `sliding_windows` attribute
             cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
             if (
-                getattr(self.config, "sliding_window", None) is not None
-                and kv_seq_len > self.config.sliding_window
-                and cache_has_contents
+                    getattr(self.config, "sliding_window", None) is not None
+                    and kv_seq_len > self.config.sliding_window
+                    and cache_has_contents
             ):
                 slicing_tokens = 1 - self.config.sliding_window
 
@@ -478,15 +475,15 @@ class Qwen2FlashAttention2(Qwen2Attention):
         return attn_output, attn_weights, past_key_value
 
     def _flash_attention_forward(
-        self,
-        query_states,
-        key_states,
-        value_states,
-        attention_mask,
-        query_length,
-        dropout=0.0,
-        softmax_scale=None,
-        use_sliding_windows=False,
+            self,
+            query_states,
+            key_states,
+            value_states,
+            attention_mask,
+            query_length,
+            dropout=0.0,
+            softmax_scale=None,
+            use_sliding_windows=False,
     ):
         """
         Calls the forward method of Flash Attention - if the input hidden states contain at least one padding token
@@ -589,7 +586,7 @@ class Qwen2FlashAttention2(Qwen2Attention):
         # by slicing it on the proper place
         if kv_seq_len != attention_mask.shape[-1]:
             attention_mask_num_tokens = attention_mask.shape[-1]
-            attention_mask = attention_mask[:, attention_mask_num_tokens - kv_seq_len :]
+            attention_mask = attention_mask[:, attention_mask_num_tokens - kv_seq_len:]
 
         indices_k, cu_seqlens_k, max_seqlen_in_batch_k = _get_unpad_data(attention_mask)
 
@@ -635,13 +632,13 @@ class Qwen2SdpaAttention(Qwen2Attention):
 
     # Adapted from Qwen2Attention.forward
     def forward(
-        self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Cache] = None,
-        output_attentions: bool = False,
-        use_cache: bool = False,
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_value: Optional[Cache] = None,
+            output_attentions: bool = False,
+            use_cache: bool = False,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         if output_attentions:
             # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
@@ -737,14 +734,14 @@ class Qwen2DecoderLayer(nn.Module):
         self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
     def forward(
-        self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
-        output_attentions: Optional[bool] = False,
-        use_cache: Optional[bool] = False,
-        **kwargs,
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_value: Optional[Tuple[torch.Tensor]] = None,
+            output_attentions: Optional[bool] = False,
+            use_cache: Optional[bool] = False,
+            **kwargs,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         if "padding_mask" in kwargs:
             warnings.warn(
@@ -946,16 +943,16 @@ class Qwen2Model(Qwen2PreTrainedModel):
 
     @add_start_docstrings_to_model_forward(QWEN2_INPUTS_DOCSTRING)
     def forward(
-        self,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+            self,
+            input_ids: torch.LongTensor = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_values: Optional[List[torch.FloatTensor]] = None,
+            inputs_embeds: Optional[torch.FloatTensor] = None,
+            use_cache: Optional[bool] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1136,19 +1133,20 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
     @add_start_docstrings_to_model_forward(QWEN2_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
     def forward(
-        self,
-        input_ids: torch.LongTensor = None,  # 输入的ids，通常是序列的索引
-        attention_mask: Optional[torch.Tensor] = None,  # 注意力掩码，用于指示序列中的有效位置
-        position_ids: Optional[torch.LongTensor] = None,  # 位置ids，用于表示序列中每个token的位置
-        past_key_values: Optional[List[torch.FloatTensor]] = None,  # 过去的关键值，用于上下文信息的缓存
-        inputs_embeds: Optional[torch.FloatTensor] = None,  # 输入的嵌入表示，通常用于直接输入序列的嵌入
-        labels: Optional[torch.LongTensor] = None,  # 标签，用于计算损失
-        use_cache: Optional[bool] = None,  # 是否使用缓存，用于控制是否在每一步生成中使用过去的关键值
-        output_attentions: Optional[bool] = None,  # 是否输出注意力权重
-        output_hidden_states: Optional[bool] = None,  # 是否输出隐藏状态
-        return_dict: Optional[bool] = None,  # 是否返回一个字典格式的输出
+            self,
+            input_ids: torch.LongTensor = None,  # 输入的ids，通常是序列的索引
+            attention_mask: Optional[torch.Tensor] = None,  # 注意力掩码，用于指示序列中的有效位置
+            position_ids: Optional[torch.LongTensor] = None,  # 位置ids，用于表示序列中每个token的位置
+            past_key_values: Optional[List[torch.FloatTensor]] = None,  # 过去的关键值，用于上下文信息的缓存
+            inputs_embeds: Optional[torch.FloatTensor] = None,  # 输入的嵌入表示，通常用于直接输入序列的嵌入
+            labels: Optional[torch.LongTensor] = None,  # 标签，用于计算损失
+            use_cache: Optional[bool] = None,  # 是否使用缓存，用于控制是否在每一步生成中使用过去的关键值
+            output_attentions: Optional[bool] = None,  # 是否输出注意力权重
+            output_hidden_states: Optional[bool] = None,  # 是否输出隐藏状态
+            return_dict: Optional[bool] = None,  # 是否返回一个字典格式的输出
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
+        # 根据配置设置默认的输出注意力、隐藏状态和返回字典的值  函数设置了默认的参数值，如果用户没有提供这些参数，它们将使用模型配置中的默认值。
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1156,6 +1154,7 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+        # 解码器的输出包括(解码特征， 层状态， 解码隐藏状态， 解码注意力)模型调用了一个名为 self.model 的对象，它可能是一个预训练的语言模型，如BERT或GPT。这个调用产生了解码器的输出。
         outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -1167,28 +1166,39 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-
+        # 获取隐藏状态 函数获取了隐藏状态，并通过了语言模型头（lm_head）来得到logits。
         hidden_states = outputs[0]
+        # 通过语言模型头获取logits
         logits = self.lm_head(hidden_states)
+        # 将logits转换为浮点数，因为模型可能是并行的
         logits = logits.float()
 
+        # 如果提供了标签，函数会计算损失。这里使用了 CrossEntropyLoss，它是一种常用的损失函数，用于分类任务，其中输出的大小为词汇表大小，而标签是 one-hot 编码的。
         loss = None
+        # 如果提供了标签，计算损失
         if labels is not None:
             # Shift so that tokens < n predict n
+            # 将logits左移一位，以便预测当前位置的下一个词
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
+            # 平坦化标签
             loss_fct = CrossEntropyLoss()
             shift_logits = shift_logits.view(-1, self.config.vocab_size)
             shift_labels = shift_labels.view(-1)
             # Enable model parallelism
+            # 将标签移动到与logits相同的设备
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
 
+        # 如果不是返回字典，则返回(logits,) + outputs[1:]，如果存在损失，则返回(loss,) + output
+        # 处理了非字典格式的返回值。如果配置设置了 return_dict=False，它将返回一个元组，包括 logits 和模型的其他输出。如果有损失，它还会返回损失。
         if not return_dict:
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
+        # 如果返回字典，则返回CausalLMOutputWithPast对象
+        # 如果配置设置了 return_dict=True，它将返回一个 CausalLMOutputWithPast 对象，这是一个自定义的PyTorch结构，包含损失、logits以及模型的其他隐藏状态和注意力信息。
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
@@ -1198,60 +1208,78 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
         )
 
     def prepare_inputs_for_generation(
-        self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
+            self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
     ):
         # Omit tokens covered by past_key_values
+        # 如果存在past_key_values（即模型缓存），则忽略已处理过的token
         if past_key_values is not None:
-            if isinstance(past_key_values, Cache):
-                cache_length = past_key_values.get_seq_length()
-                past_length = past_key_values.seen_tokens
-                max_cache_length = past_key_values.get_max_length()
-            else:
-                cache_length = past_length = past_key_values[0][0].shape[2]
-                max_cache_length = None
+            # 检查并获取缓存相关信息：序列长度、已处理过的tokens数量和最大缓存长度
+            if isinstance(past_key_values, Cache):# 检查past_key_values是否是Cache类型
+                # 如果past_key_values是Cache对象
+                cache_length = past_key_values.get_seq_length()     # 获取缓存的长度
+                past_length = past_key_values.seen_tokens           # 获取已处理的token数量
+                max_cache_length = past_key_values.get_max_length() # 获取已处理的token数量
+            else:  # 否则将其视为张量列表
+                cache_length = past_length = past_key_values[0][0].shape[2] # 如果不是Cache类型，则使用第一个元素的形状来确定长度
+                max_cache_length = None         # 最大缓存长度设置为None
 
             # Keep only the unprocessed tokens:
             # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
             # some of the inputs are exclusively passed as part of the cache (e.g. when passing input_embeds as
             # input)
+            # 根据情况保留未处理的tokens
+            # 1. 当attention_mask长度大于input_ids时，表明部分输入仅作为缓存传递（例如通过inputs_embeds）
+            # 1 - 如果attention_mask的形状[1]大于input_ids的形状[1]，则我们处于一种情况，其中一些输入作为缓存的一部分传递（例如，当传递input_embeds作为输入时）
             if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
-                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length):]
             # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
             # input_ids based on the past_length.
+            # 2. 若已处理过的tokens数量小于input_ids的长度，则从input_ids中去除已处理过的tokens
+            # 2 - 如果past_length是小于input_ids的形状[1]，则input_ids包含所有输入的token。我们可以根据past_length丢弃input_ids。
             elif past_length < input_ids.shape[1]:
                 input_ids = input_ids[:, past_length:]
             # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
-
             # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
+            # 3. 其他情况下（已处理过的tokens数等于或大于input_ids长度），假设input_ids只包含未处理的tokens
+            # 如果即将超过最大缓存长度，需要裁剪attention_mask
+            # 3 - 否则（past_length >= input_ids.shape[1]），让我们假设input_ids只包含未处理的token。
+            # 如果我们将要超过最大缓存长度，我们需要截断输入的attention_mask
             if (
-                max_cache_length is not None
-                and attention_mask is not None
-                and cache_length + input_ids.shape[1] > max_cache_length
+                    max_cache_length is not None
+                    and attention_mask is not None
+                    and cache_length + input_ids.shape[1] > max_cache_length
             ):
                 attention_mask = attention_mask[:, -max_cache_length:]
 
-        position_ids = kwargs.get("position_ids", None)
-        if attention_mask is not None and position_ids is None:
+        # 获取或创建position_ids
+        position_ids = kwargs.get("position_ids", None)# 从kwargs中获取position_ids，如果不在kwargs中，则默认为None
+        if attention_mask is not None and position_ids is None:# 如果attention_mask存在而position_ids不存在
             # create position_ids on the fly for batch generation
-            position_ids = attention_mask.long().cumsum(-1) - 1
-            position_ids.masked_fill_(attention_mask == 0, 1)
+            # 在批处理生成时动态创建position_ids
+            position_ids = attention_mask.long().cumsum(-1) - 1 # 计算每个token的位置ID
+            position_ids.masked_fill_(attention_mask == 0, 1)   # 将attention_mask为0的位置填充为1
+            # 若存在past_key_values，则调整position_ids大小以匹配input_ids
             if past_key_values:
-                position_ids = position_ids[:, -input_ids.shape[1] :]
+                position_ids = position_ids[:, -input_ids.shape[1]:]# 只保留与input_ids相同长度的position_ids
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+        # 如果提供了inputs_embeds且无past_key_values，则仅在第一步生成时使用它
+        # 如果传递了inputs_embeds，我们只希望在第一个生成步骤中使用它们
         if inputs_embeds is not None and past_key_values is None:
-            model_inputs = {"inputs_embeds": inputs_embeds}
+            model_inputs = {"inputs_embeds": inputs_embeds}     # 创建一个模型输入字典，只包含inputs_embeds
         else:
-            model_inputs = {"input_ids": input_ids}
+            model_inputs = {"input_ids": input_ids}     # 否则，创建一个模型输入字典，只包含input_ids
 
+        # 更新model_inputs字典
         model_inputs.update(
             {
                 "position_ids": position_ids,
                 "past_key_values": past_key_values,
-                "use_cache": kwargs.get("use_cache"),
-                "attention_mask": attention_mask,
+                "use_cache": kwargs.get("use_cache"),   # 添加use_cache参数
+                "attention_mask": attention_mask,   # 添加attention_mask参数
             }
         )
+        # 返回整理后的模型输入参数
         return model_inputs
 
     @staticmethod
@@ -1297,17 +1325,17 @@ class Qwen2ForSequenceClassification(Qwen2PreTrainedModel):
 
     @add_start_docstrings_to_model_forward(QWEN2_INPUTS_DOCSTRING)
     def forward(
-        self,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+            self,
+            input_ids: torch.LongTensor = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_values: Optional[List[torch.FloatTensor]] = None,
+            inputs_embeds: Optional[torch.FloatTensor] = None,
+            labels: Optional[torch.LongTensor] = None,
+            use_cache: Optional[bool] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
     ) -> Union[Tuple, SequenceClassifierOutputWithPast]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
