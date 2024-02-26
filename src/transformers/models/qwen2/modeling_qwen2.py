@@ -808,32 +808,80 @@ QWEN2_START_DOCSTRING = r"""
             Model configuration class with all the parameters of the model. Initializing with a config file does not
             load the weights associated with the model, only the configuration. Check out the
             [`~PreTrainedModel.from_pretrained`] method to load the model weights.
+    这个模型继承自 `PreTrainedModel`。查看超类文档，了解库为所有模型实现的通用方法（例如下载或保存、调整输入嵌入的大小、修剪头部等）。
+    这个模型还是 PyTorch [torch.nn.Module](https://pytorch.org/docs/stable/nn.html#torch.nn.Module) 的子类。
+    将其用作常规 PyTorch 模块，并参考 PyTorch 文档关于通用使用和行为的所有问题。
+    参数：
+    config ([`Qwen2Config`]):
+        包含模型所有参数的模型配置类。使用配置文件进行初始化不会加载与模型关联的权重，只会加载配置。查看 `[~PreTrainedModel.from_pretrained]` 方法以加载模型权重。
 """
 
 
 @add_start_docstrings(
-    "The bare Qwen2 Model outputting raw hidden-states without any specific head on top.",
+    "The bare Qwen2 Model outputting raw hidden-states without any specific head on top.原始Qwen2模型，输出的原始隐藏状态没有任何特定的头部。",
     QWEN2_START_DOCSTRING,
 )
+
+# 定义一个继承自PreTrainedModel的类Qwen2PreTrainedModel
 class Qwen2PreTrainedModel(PreTrainedModel):
+    # 指定该模型的配置类为Qwen2Config
     config_class = Qwen2Config
+    # 指定模型基模型的前缀为"model"
     base_model_prefix = "model"
+    # 支持梯度检查点,指示模型支持梯度检查点技术（用于节省内存）
     supports_gradient_checkpointing = True
+    # 设置不为"Qwen2DecoderLayer"的模块可以分割,指定在进行模型拆分时不应拆分的模块列表
     _no_split_modules = ["Qwen2DecoderLayer"]
+    # 跳过设备放置的键,指定在移动设备上应跳过放置某些键值对参数的模块名
     _skip_keys_device_placement = "past_key_values"
+    # 支持flash attention 2机制
     _supports_flash_attn_2 = True
+    # 支持sdpa（一种可能的高效注意力机制）
     _supports_sdpa = True
+    # 支持缓存类
     _supports_cache_class = True
 
+    # 初始化模型权重的方法
+    """
+    代码逻辑分析： 
+        这段代码定义了一个名为Qwen2PreTrainedModel的类，它继承自PreTrainedModel。
+        这个类主要用来初始化一个预训练的Qwen2模型，并设置了一些模型相关的属性。
+        •config_class 表示与当前模型关联的配置类。
+        •_no_split_modules、_skip_keys_device_placement 等属性用于在特定情况下控制模型的处理方式，如模型拆分、设备分配等。
+        •_supports_flash_attn_2、_supports_sdpa 和 _supports_cache_class 则表明该模型支持的一些特殊功能或优化方法。
+        同时，定义了一个内部方法 _init_weights，该方法用于初始化模型中的各个模块（如线性层和嵌入层）的权重。
+        其中：
+            1. 对于线性层（nn.Linear），其权重按照正态分布初始化，标准差由模型配置中的 initializer_range 参数决定；若存在偏置项则将其初始化为零。
+            2. 对于嵌入层（nn.Embedding），同样采用正态分布初始化权重，但若指定了填充索引，则会将相应位置的权重置零。
+    代码逻辑分析：
+        此方法_init_weights是用于初始化模型的权重的。它通过module参数接收要初始化的模块。
+        首先，它获取一个名为initializer_range的配置参数，这个参数通常用于确定权重的初始化标准差。
+        然后，它检查传递的模块是否是nn.Linear类型，也就是线性层。如果是，它将使用正态分布来初始化权重，并且如果存在偏置，也会将偏置初始化为0。
+        接着，如果模块是nn.Embedding类型，也就是嵌入层，它同样使用正态分布来初始化权重。
+        最后，如果嵌入层有设置padding_idx，它将这个索引对应的权重初始化为0，这是为了保证在嵌入层中，填充（padding）的向量与其它向量有不同的表示，即它们的对应权重为0。
+        这个方法是一个常见的初始化技术，用于确保模型的权重以较随机的方式开始训练，这对于避免一些优化问题是有帮助的。
+    """
     def _init_weights(self, module):
+        # 获取模型初始化范围的标准差
         std = self.config.initializer_range
+        # 检查当前模块是否是nn.Linear类型
         if isinstance(module, nn.Linear):
+            # 对权重数据进行正态分布初始化，均值为0，标准差为std
+            # 如果是线性层，则对其权重进行正态分布初始化
             module.weight.data.normal_(mean=0.0, std=std)
+            # 如果线性层有偏置，则将偏置初始化为0
             if module.bias is not None:
+                # 若存在偏置项，则将偏置项数据初始化为零
                 module.bias.data.zero_()
+        # 如果module是嵌入层（nn.Embedding）
+        # 检查当前模块是否是nn.Embedding类型
         elif isinstance(module, nn.Embedding):
+            # 同样对权重数据进行正态分布初始化
+            # 如果是嵌入层，则对其权重进行正态分布初始化
             module.weight.data.normal_(mean=0.0, std=std)
+            # 如果嵌入层有padding_idx，则将该索引对应的权重初始化为0
             if module.padding_idx is not None:
+                # 若存在填充索引，则将对应位置的权重数据清零
                 module.weight.data[module.padding_idx].zero_()
 
 
@@ -904,11 +952,50 @@ QWEN2_INPUTS_DOCSTRING = r"""
             more detail.
         return_dict (`bool`, *optional*):
             Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
+    参数：
+        •input_ids (torch.LongTensor，形状为 (batch_size, 序列长度)): 
+            词汇表中输入序列令牌的索引。
+            默认情况下，如果提供填充，则会忽略填充。
+            可以通过 [AutoTokenizer] 获取这些索引。
+            详情请参阅 [PreTrainedTokenizer.encode] 和 [PreTrainedTokenizer.__call__] 。什么是输入ID？
+        •attention_mask (torch.Tensor，形状为 (batch_size, 序列长度), 可选): 
+            避免对填充令牌索引执行注意力操作的掩码。
+            掩码值在 [0, 1] 中选择： •1 表示该令牌 未被遮蔽，•0 表示该令牌 已被遮蔽。 
+            什么是注意力掩码？ 可以通过 [AutoTokenizer] 获取这些掩码索引。
+            更多细节请参考 [PreTrainedTokenizer.encode] 和 [PreTrainedTokenizer.__call__] 。
+            如果使用了 past_key_values 参数，那么仅需输入最后的 decoder_input_ids （见 past_key_values）。
+            如果你想改变填充行为，请查阅 [modeling_opt._prepare_decoder_attention_mask] 并按需求进行修改。
+            关于默认策略的更多信息，可以查看 论文 图1部分。•1 表示头 未被遮蔽，•0 表示头 被遮蔽。
+        •position_ids (torch.LongTensor，形状为 (batch_size, 序列长度), 可选): 
+            输入序列每个令牌在位置嵌入中的位置索引，在 [0, config.n_positions - 1] 范围内选择。
+            什么是位置ID？
+        •past_key_values (Cache 或 tuple(tuple(torch.FloatTensor)), 可选): 
+            可用于加速顺序解码的预先计算的隐藏状态（自注意力块和交叉注意力块中的键和值）。
+            这通常由模型在上一步解码阶段返回的 past_key_values 构成，当 use_cache=True 或 config.use_cache=True 时。
+            有两种格式允许： 
+                •一个 [~cache_utils.Cache] 实例；
+                •由 tuple(torch.FloatTensor) 组成的元组，长度为 config.n_layers，其中每个元组包含2个形状为 (batch_size, num_heads, 序列长度, embed_size_per_head) 的张量）。
+                这也被称为传统缓存格式。 
+                模型输出的缓存格式将与输入的格式相同。
+                如果没有传递 past_key_values，则会返回传统缓存格式。 
+                如果使用了 past_key_values，用户可以选择只输入最后的 input_ids（那些尚未给此模型提供过去关键值状态的 input_ids），其形状为 (batch_size, 1)，而不是所有形状为 (batch_size, 序列长度) 的 input_ids。
+        •inputs_embeds (torch.FloatTensor，形状为 (batch_size, 序列长度, 隐藏尺寸), 可选): 
+            可选地，您可以直接传入嵌入表示，而不是 input_ids。
+            如果您希望在将 input_ids 索引转换为其关联向量方面拥有比模型内部嵌入查找矩阵更多的控制权，这将非常有用。
+        •use_cache (bool, 可选): 
+            如果设置为 True，将返回 past_key_values 键值状态，并可用于加速解码（见 past_key_values）。
+        •output_attentions (bool, 可选): 
+            是否返回所有注意力层的注意力张量。
+            有关更多详细信息，请参阅返回的张量下的 attentions 。
+        •output_hidden_states (bool, 可选): 
+            是否返回所有层的隐藏状态。有关更多详细信息，请参阅返回的张量下的 hidden_states 。
+        •return_dict (bool, 可选): 
+            是否返回一个 [~utils.ModelOutput] 实例，而不是普通的元组。
 """
 
 
 @add_start_docstrings(
-    "The bare Qwen2 Model outputting raw hidden-states without any specific head on top.",
+    "The bare Qwen2 Model outputting raw hidden-states without any specific head on top.裸露的 Qwen2 模型，输出的原始隐藏状态没有任何特定的头部。",
     QWEN2_START_DOCSTRING,
 )
 class Qwen2Model(Qwen2PreTrainedModel):
@@ -916,6 +1003,9 @@ class Qwen2Model(Qwen2PreTrainedModel):
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`Qwen2DecoderLayer`]
 
     Args:
+        config: Qwen2Config
+    Transformer 解码器，由 `config.num_hidden_layers` 层组成。每一层都是一个 `Qwen2DecoderLayer`。
+    参数：
         config: Qwen2Config
     """
 
@@ -1352,8 +1442,12 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
     no `pad_token_id` is defined, it simply takes the last value in each row of the batch. Since it cannot guess the
     padding tokens when `inputs_embeds` are passed instead of `input_ids`, it does the same (take the last value in
     each row of the batch).
-    
-    
+    Qwen2 模型转换器带有序列分类头（线性层）。
+    `Qwen2ForSequenceClassification` 使用了最后一个标记来进行分类，就像其他因果模型（例如 GPT-2）一样。
+    由于它是基于最后一个标记进行分类的，所以需要知道最后一个标记的位置。
+    如果配置中定义了 `pad_token_id`，它会查找每行中不是填充标记的最后一个标记。
+    如果没有定义 `pad_token_id`，它简单地取批次中每行的最后一个值。
+    由于当传入 `inputs_embeds` 而不是 `input_ids` 时无法猜测填充标记，它采取相同的做法（取批次中每行的最后一个值）。
     """,
     QWEN2_START_DOCSTRING,
 )
