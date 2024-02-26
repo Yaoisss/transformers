@@ -1130,6 +1130,18 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
         return self.model
 
     # 定义前向传播的方法，该方法接受多个输入参数，并在末尾返回一个或多个输出 添加文档字符串，并定义模型前向传播方法
+    r"""
+    代码逻辑分析：
+    这段代码定义了一个名为forward的方法，这是PyTorch神经网络模块的标准前向传播函数。
+    此方法首先处理了一些控制输出内容的参数，如是否输出注意力权重、隐藏状态等，这些参数会根据用户指定的或模型配置中的默认值来确定。
+    接着，调用了self.model，这通常是一个预训练的语言模型核心组件，用于处理输入并生成各种输出，包括但不限于隐藏状态。
+    之后从self.model的输出中提取出最后一层的隐藏状态，并将其传给模型的lm_head部分，得到最终的logits（即预测概率分布）。
+    如果在训练模式下提供了labels，则会计算基于交叉熵损失函数的损失值。
+    最后，根据return_dict参数的值决定如何打包并返回结果：
+    若为False，则返回一个包含了logits及其它中间输出（如有损失则包含损失）的元组；
+    若为True，则返回一个自定义结构体CausalLMOutputWithPast，
+    其中包含了所有必要的输出信息，如损失、logits、过去的关键值缓存、隐藏状态和注意力权重。
+    """
     @add_start_docstrings_to_model_forward(QWEN2_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
     def forward(
