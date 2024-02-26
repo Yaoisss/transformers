@@ -1179,13 +1179,15 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
             return_dict=return_dict,
         )
         # 获取隐藏状态 函数获取了隐藏状态，并通过了语言模型头（lm_head）来得到logits。
+        # 提取最后一层的隐藏状态
         hidden_states = outputs[0]
-        # 通过语言模型头获取logits
+        # 通过语言模型头获取logits,将隐藏状态通过语言模型头部得到预测logits
         logits = self.lm_head(hidden_states)
-        # 将logits转换为浮点数，因为模型可能是并行的
+        # 将logits转换为浮点类型以适应可能存在的模型并行化需求
         logits = logits.float()
 
         # 如果提供了标签，函数会计算损失。这里使用了 CrossEntropyLoss，它是一种常用的损失函数，用于分类任务，其中输出的大小为词汇表大小，而标签是 one-hot 编码的。
+        # 计算损失（仅当提供了labels时执行）
         loss = None
         # 如果提供了标签，计算损失
         if labels is not None:
@@ -1194,12 +1196,12 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel):
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
-            # 平坦化标签
+            # 将数据展平并计算交叉熵损失
             loss_fct = CrossEntropyLoss()
             shift_logits = shift_logits.view(-1, self.config.vocab_size)
             shift_labels = shift_labels.view(-1)
             # Enable model parallelism
-            # 将标签移动到与logits相同的设备
+            # 将标签移动到与logits相同的设备 确保设备一致并将标签移到与logits相同的设备上
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
 
