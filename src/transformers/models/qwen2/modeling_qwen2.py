@@ -998,6 +998,8 @@ QWEN2_INPUTS_DOCSTRING = r"""
     "The bare Qwen2 Model outputting raw hidden-states without any specific head on top.裸露的 Qwen2 模型，输出的原始隐藏状态没有任何特定的头部。",
     QWEN2_START_DOCSTRING,
 )
+
+# 定义一个Qwen2模型的类，继承自Qwen2PreTrainedModel
 class Qwen2Model(Qwen2PreTrainedModel):
     """
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`Qwen2DecoderLayer`]
@@ -1010,28 +1012,65 @@ class Qwen2Model(Qwen2PreTrainedModel):
     """
 
     def __init__(self, config: Qwen2Config):
+        """
+        代码逻辑分析：
+            这个代码定义了一个名为Qwen2Model的类，它继承自预训练模型基类Qwen2PreTrainedModel。
+            在初始化时，该类做了以下几件事：
+                1. 从传入的配置对象中获取并设置模型的填充索引（padding_idx）和词汇表大小（vocab_size）。
+                2. 创建一个词嵌入层（nn.Embedding），用于将输入的词汇ID转换为对应的隐藏状态向量。
+                3. 根据配置文件中指定的隐藏层数量，动态构建一系列的Qwen2DecoderLayer作为模型的核心解码器层，并存储在一个nn.ModuleList中。
+                4. 设置自定义的注意力实现方式和归一化层（Qwen2RMSNorm）。
+                5. 初始化权重，并通过post_init()方法执行最后的处理步骤。
+            此外，还提供了两个方法：
+                •get_input_embeddings()：返回当前模型使用的输入嵌入层。
+                •set_input_embeddings(value)：允许用户替换模型现有的输入嵌入层。
+        分析：
+            Qwen2Model类继承自Qwen2PreTrainedModel，这是典型的类继承关系，使得Qwen2Model能够继承Qwen2PreTrainedModel中的属性和方法。
+            在__init__方法中，首先通过super().__init__(config)调用父类的初始化方法，这是Python中进行类继承时的标准做法。
+            接着，设置padding_idx和vocab_size两个属性，它们分别用于确定序列填充的词汇索引和词汇表的大小。
+            创建nn.Embedding层，这个层将用于将输入的词汇ID转换为对应的隐藏状态向量。
+            使用列表推导式创建一系列Qwen2DecoderLayer实例，并将其存储在self.layers中，Qwen2DecoderLayer是模型的核心解码器层。
+            设置_attn_implementation和self.norm，分别是自定义的注意力实现方式和归一化层。
+            self.gradient_checkpointing被设置为False，这通常用于在模型训练过程中进行梯度检查，以节省计算资源。
+            post_init()方法用于执行初始化之后的最后处理步骤。
+            get_input_embeddings和set_input_embeddings方法允许用户获取和设置模型的输入嵌入层。
+            整体上，这段代码定义了一个模型类，它包含了对输入文本进行嵌入的机制，以及多个解码器层来实现序列到序列的转换。
+        """
         super().__init__(config)
+        # 设置padding_idx，它是嵌入层中用于填充的索引
         self.padding_idx = config.pad_token_id
+        # 设置词汇表大小
         self.vocab_size = config.vocab_size
 
+        # 创建嵌入层，将词汇表大小和隐藏大小映射到嵌入向量,创建词嵌入层，将每个词映射到隐藏状态向量空间
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        # 创建解码器层列表，每个层都是`Qwen2DecoderLayer`
+        # 构建解码器层模块列表，根据配置中的隐藏层数量创建相应数量的Qwen2DecoderLayer实例
         self.layers = nn.ModuleList(
             [Qwen2DecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
+        # 设置注意力实现的类型
         self._attn_implementation = config._attn_implementation
+        # 创建标准化层
+        # 添加归一化层，使用Qwen2RMSNorm
         self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
+        # 设置是否使用梯度检查点，默认不使用
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
+        # 初始化权重并进行最后的处理
         self.post_init()
 
+    # 获取输入嵌入层
     def get_input_embeddings(self):
         return self.embed_tokens
 
+    # 设置输入嵌入层
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
     @add_start_docstrings_to_model_forward(QWEN2_INPUTS_DOCSTRING)
+    # 定义前向传播方法
     def forward(
             self,
             input_ids: torch.LongTensor = None,
