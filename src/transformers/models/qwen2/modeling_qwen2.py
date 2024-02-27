@@ -1072,51 +1072,66 @@ class Qwen2Model(Qwen2PreTrainedModel):
     @add_start_docstrings_to_model_forward(QWEN2_INPUTS_DOCSTRING)
     # 定义前向传播方法
     def forward(
+            # 以下参数都是可选的，它们允许模型根据需要接收不同的输入
             self,
-            input_ids: torch.LongTensor = None,
-            attention_mask: Optional[torch.Tensor] = None,
-            position_ids: Optional[torch.LongTensor] = None,
-            past_key_values: Optional[List[torch.FloatTensor]] = None,
-            inputs_embeds: Optional[torch.FloatTensor] = None,
-            use_cache: Optional[bool] = None,
-            output_attentions: Optional[bool] = None,
-            output_hidden_states: Optional[bool] = None,
-            return_dict: Optional[bool] = None,
+            input_ids: torch.LongTensor = None,  # 输入的序列ID
+            attention_mask: Optional[torch.Tensor] = None,  # 注意力掩码，用于指示序列中哪些元素应该被模型关注
+            position_ids: Optional[torch.LongTensor] = None,  # 位置ID，用于表示序列中每个词的位置
+            past_key_values: Optional[List[torch.FloatTensor]] = None,  # 来自上一个序列的键值对，用于模型中的上下文信息
+            inputs_embeds: Optional[torch.FloatTensor] = None,  # 输入的嵌入向量，直接输入到模型中
+            use_cache: Optional[bool] = None,  # 是否使用缓存（例如，在序列生成时）
+            output_attentions: Optional[bool] = None,  # 是否输出注意力权重
+            output_hidden_states: Optional[bool] = None,  # 是否输出隐藏状态
+            return_dict: Optional[bool] = None  # 是否返回一个字典格式的输出
     ) -> Union[Tuple, BaseModelOutputWithPast]:
+        # 首先，根据输入参数和配置设置输出注意力、隐藏状态和是否使用缓存
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
+        # 决定是否返回字典格式的输出
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # retrieve input_ids and inputs_embeds
+        # 检查输入ID和嵌入向量是否同时存在，如果不存在，则根据输入ID生成嵌入向量
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time.不能同时指定decoder_input_ids和decoder_inputs_embeds")
         elif input_ids is not None:
+            # 获取输入ID的批次大小和序列长度
             batch_size, seq_length = input_ids.shape
         elif inputs_embeds is not None:
+            # 获取嵌入向量的批次大小、序列长度和特征数量
             batch_size, seq_length, _ = inputs_embeds.shape
         else:
-            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds.您必须指定decoder_input_ids或decoder_inputs_embeds")
 
+        # 如果开启梯度检查点（gradient checkpointing）且当前为训练模式，并且用户设置了use_cache=True
         if self.gradient_checkpointing and self.training:
+            # 则警告用户缓存无法与梯度检查点一起使用，并强制设置use_cache=False
             if use_cache:
                 logger.warning_once(
-                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`....`use_cache=True`与渐变检查点不兼容。正在设置`use_cache=False`..."
                 )
                 use_cache = False
 
+        # 初始化过去缓存的长度
         past_key_values_length = 0
 
+        # 如果启用缓存，则处理缓存
         if use_cache:
+            # 检查是否需要从旧缓存转换为新缓存
             use_legacy_cache = not isinstance(past_key_values, Cache)
+            # 如果需要转换，则转换缓存
             if use_legacy_cache:
                 past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+            # 获取可用的缓存长度
             past_key_values_length = past_key_values.get_usable_length(seq_length)
 
+        # 如果未指定位置ID，则生成它们
         if position_ids is None:
+            # 获取输入ID或嵌入向量的设备
             device = input_ids.device if input_ids is not None else inputs_embeds.device
             position_ids = torch.arange(
                 past_key_values_length, seq_length + past_key_values_length, dtype=torch.long, device=device
