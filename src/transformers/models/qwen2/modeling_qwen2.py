@@ -1116,46 +1116,55 @@ class Qwen2Model(Qwen2PreTrainedModel):
                 )
                 use_cache = False
 
-        # 初始化过去缓存的长度
+        # 初始化过去缓存的长度,# 初始化过去缓存的长度为0，用于后续计算中与当前输入序列结合生成完整的位置ID序列
         past_key_values_length = 0
 
         # 如果启用缓存，则处理缓存
         if use_cache:
-            # 检查是否需要从旧缓存转换为新缓存
+            # 检查是否需要从旧缓存转换为新缓存,检查传入的过去关键值是否是旧版缓存类型，如果不是则需要转换成新式动态缓存
             use_legacy_cache = not isinstance(past_key_values, Cache)
-            # 如果需要转换，则转换缓存
+            # 如果需要转换，则转换缓存,若需转换，则从旧缓存格式转换到DynamicCache的新格式
             if use_legacy_cache:
                 past_key_values = DynamicCache.from_legacy_cache(past_key_values)
-            # 获取可用的缓存长度
+            # 获取可用的缓存长度, 获取可用的缓存有效长度，即可以和当前输入序列拼接使用的长度
             past_key_values_length = past_key_values.get_usable_length(seq_length)
 
         # 如果未指定位置ID，则生成它们
         if position_ids is None:
-            # 获取输入ID或嵌入向量的设备
+            # 获取输入ID或嵌入向量的设备,确定设备：根据input_ids（如果存在）或inputs_embeds确定张量所在设备
             device = input_ids.device if input_ids is not None else inputs_embeds.device
+            # 生成一个从缓存长度开始、直到当前序列长度加上缓存长度结束的位置ID序列
             position_ids = torch.arange(
                 past_key_values_length, seq_length + past_key_values_length, dtype=torch.long, device=device
             )
+            # 将位置ID调整形状以适应模型输入要求，将其展平后再重塑为(batch_size, seq_length)的形式
             position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
         else:
             position_ids = position_ids.view(-1, seq_length).long()
 
+        # 如果没有提供嵌入后的输入向量，那么通过embed_tokens方法从input_ids创建
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
+        # 对于特定的注意力实现方式"flash_attention_2"，检查attention_mask是否允许右填充
         if attention_mask is not None and self._attn_implementation == "flash_attention_2" and use_cache:
+            # 如果最后一列中有非全零元素，表示存在右填充，抛出错误提示
             is_padding_right = attention_mask[:, -1].sum().item() != batch_size
             if is_padding_right:
                 raise ValueError(
                     "You are attempting to perform batched generation with padding_side='right'"
                     " this may lead to unexpected behaviour for Flash Attention version of Qwen2. Make sure to "
                     " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
+                    "在对Flash Attention版本的Qwen2进行批次生成时，发现采用了右侧填充，这可能会导致意外行为。请确保在对输入进行分词之前设置 `tokenizer.padding_side = 'left'` 。"
                 )
 
+        # 根据不同的注意力实现选择合适的注意力掩码准备方式 判断是否使用flash attention机制
         if self._attn_implementation == "flash_attention_2":
             # 2d mask is passed through the layers
-            attention_mask = attention_mask if (attention_mask is not None and 0 in attention_mask) else None
+            # 对于"flash_attention_2"，传递二维掩码至各层
+            attention_mask = attention_mask if (attention_mask is not None and 0 in attention_mask) else None # 根据attention_mask判断是否需要使用掩码
         elif self._attn_implementation == "sdpa" and not output_attentions:
+            # 对于"sdpa"实现且不输出注意力权重的情况下，需要4维因果掩码，这里进行相应准备
             # output_attentions=True can not be supported when using SDPA, and we fall back on
             # the manual implementation that requires a 4D causal mask in all cases.
             attention_mask = _prepare_4d_causal_attention_mask_for_sdpa(
@@ -1165,8 +1174,9 @@ class Qwen2Model(Qwen2PreTrainedModel):
                 past_key_values_length,
             )
         else:
+            # 对于其他情况，包括默认实现，构建并传递4维因果掩码至各层
             # 4d mask is passed through the layers
-            attention_mask = _prepare_4d_causal_attention_mask(
+            attention_mask = _prepare_4d_causal_attention_mask( # 使用自定义函数生成4D掩码
                 attention_mask,
                 (batch_size, seq_length),
                 inputs_embeds,
@@ -1174,6 +1184,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
                 sliding_window=self.config.sliding_window,
             )
 
+        # 设置初始隐藏状态为经过嵌入层处理的输入向量
         hidden_states = inputs_embeds
 
         # decoder layers

@@ -399,20 +399,28 @@ def _get_model_class(config, model_mapping):
 
 class _BaseAutoModelClass:
     # Base class for auto models.
+    # 定义一个名为_BaseAutoModelClass的类，它将作为自动模型的基础类。
     _model_mapping = None
+    # 类变量_model_mapping被初始化为None，它可能用于存储模型配置类到模型类的映射。
 
     def __init__(self, *args, **kwargs):
+        # 定义类的构造函数，不接受任何参数。
         raise EnvironmentError(
             f"{self.__class__.__name__} is designed to be instantiated "
             f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path)` or "
             f"`{self.__class__.__name__}.from_config(config)` methods."
         )
+        # 构造函数直接抛出一个环境错误，指出这个类不应该直接实例化，而应该使用.from_pretrained或.from_config类方法。
 
     @classmethod
     def from_config(cls, config, **kwargs):
+        # 定义一个类方法from_config，它接受一个config参数和一些关键字参数。
         trust_remote_code = kwargs.pop("trust_remote_code", None)
+        # 从关键字参数中弹出trust_remote_code，如果没有则设置为None。
         has_remote_code = hasattr(config, "auto_map") and cls.__name__ in config.auto_map
+        # 检查config是否有远程代码，并且当前类名是否在auto_map中。
         has_local_code = type(config) in cls._model_mapping.keys()
+        # 检查config的类型是否在_model_mapping字典的键中。
         trust_remote_code = resolve_trust_remote_code(
             trust_remote_code, config._name_or_path, has_local_code, has_remote_code
         )
